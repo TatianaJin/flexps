@@ -57,6 +57,15 @@ if(LIBHDFS3_FOUND)
   add_dependencies(LRExample ${external_project_dependencies})
 endif(LIBHDFS3_FOUND)
 
+# LinearClassifier
+if(LIBHDFS3_FOUND)
+  add_executable(LinearClassifier linear_classifier/linear_classifier.cpp)
+  target_link_libraries(LinearClassifier flexps)
+  target_link_libraries(LinearClassifier ${HUSKY_EXTERNAL_LIB})
+  set_property(TARGET LinearClassifier PROPERTY CXX_STANDARD 11)
+  add_dependencies(LinearClassifier ${external_project_dependencies})
+endif(LIBHDFS3_FOUND)
+
 # GBDTExample
 file(GLOB gbdt-src-files
   gbdt/src/*.cpp

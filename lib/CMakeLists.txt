@@ -3,6 +3,7 @@ include_directories(${PROJECT_SOURCE_DIR} ${HUSKY_EXTERNAL_INCLUDE})
 file(GLOB lib-src-files
 	libsvm_parser.cpp
 	batch_data_sampler.cpp
+    data_loader/hdfs_data_loader.cpp
 	)
 
 add_library(lib-objs OBJECT ${lib-src-files})

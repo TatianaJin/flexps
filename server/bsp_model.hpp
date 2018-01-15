@@ -1,3 +1,5 @@
+#pragma once
+
 #include "server/abstract_model.hpp"
 
 #include "base/message.hpp"
@@ -11,8 +13,7 @@
 
 namespace flexps {
 
-
-/* 
+/*
  * TODO: The BSPModel is now problematic!!!
  * This is because the Get() request is only sent to the servers that have the keys, and thus
  * it is possible that a worker is fast so that a server may receive Clock() which is min_clock + 2.
@@ -31,7 +32,7 @@ class BSPModel : public AbstractModel {
   int GetGetPendingSize();
   int GetAddPendingSize();
 
- private:
+ protected:
   uint32_t model_id_;
 
   ThreadsafeQueue<Message>* reply_queue_;

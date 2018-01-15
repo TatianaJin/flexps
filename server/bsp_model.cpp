@@ -19,12 +19,12 @@ void BSPModel::Clock(Message& msg) {
     }
     add_buffer_.clear();
 
+    storage_->FinishIter();
+
     for (auto get_req : get_buffer_) {
       reply_queue_->Push(storage_->Get(get_req));
     }
     get_buffer_.clear();
-
-    storage_->FinishIter();
   }
 }
 
@@ -46,7 +46,8 @@ void BSPModel::Get(Message& msg) {
   } else if (progress == progress_tracker_.GetMinClock()) {
     reply_queue_->Push(storage_->Get(msg));
   } else {
-    CHECK(false) << "progress error in BSPModel::Get { get progress: " << progress << ", min clock: " << progress_tracker_.GetMinClock() << " }";
+    CHECK(false) << "progress error in BSPModel::Get { get progress: " << progress
+                 << ", min clock: " << progress_tracker_.GetMinClock() << " }";
   }
 }
 
