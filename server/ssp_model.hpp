@@ -13,8 +13,8 @@ namespace flexps {
 
 class SSPModel : public AbstractModel {
  public:
-  explicit SSPModel(uint32_t model_id, std::unique_ptr<AbstractStorage>&& storage_ptr, int staleness,
-                    ThreadsafeQueue<Message>* reply_queue);
+  SSPModel(uint32_t model_id, std::unique_ptr<AbstractStorage>&& storage_ptr, int staleness,
+           ThreadsafeQueue<Message>* reply_queue, int dump_interval = 10000);
 
   virtual void Clock(Message& msg) override;
   virtual void Add(Message& msg) override;
@@ -23,6 +23,9 @@ class SSPModel : public AbstractModel {
   virtual void ResetWorker(Message& msg) override;
 
   int GetPendingSize(int progress);
+
+  virtual void Dump(int server_id, const std::string& path = "") override;
+  virtual void Load(const std::string& file_name) override;
 
  private:
   uint32_t model_id_;

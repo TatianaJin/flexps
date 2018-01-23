@@ -6,14 +6,15 @@
 
 #include "base/node.hpp"
 #include "base/node_util.hpp"
-#include "comm/sender.hpp"
 #include "comm/mailbox.hpp"
+#include "comm/sender.hpp"
 #include "driver/info.hpp"
 #include "driver/ml_task.hpp"
 #include "driver/simple_id_mapper.hpp"
 #include "driver/worker_spec.hpp"
 #include "server/asp_model.hpp"
 #include "server/bsp_model.hpp"
+#include "server/bsp_model_reset_add.hpp"
 #include "server/map_storage.hpp"
 #include "server/server_thread.hpp"
 #include "server/server_thread_group.hpp"
@@ -32,7 +33,7 @@
 
 namespace flexps {
 
-enum class ModelType { SSP, BSP, ASP, SparseSSP };
+enum class ModelType { SSP, BSP, ASP, SparseSSP, BSPResetAdd };
 enum class StorageType { Map, Vector };
 enum class SparseSSPRecorderType { None, Map, Vector };
 
@@ -41,8 +42,7 @@ enum class SparseSSPRecorderType { None, Map, Vector };
  */
 class KVEngine {
  public:
-  KVEngine(const Node& node, const std::vector<Node>& nodes, 
-          SimpleIdMapper* const id_mapper, Mailbox* const mailbox) 
+  KVEngine(const Node& node, const std::vector<Node>& nodes, SimpleIdMapper* const id_mapper, Mailbox* const mailbox)
       : node_(node), nodes_(nodes), id_mapper_(id_mapper), mailbox_(mailbox) {}
 
   void StartKVEngine(int num_server_threads_per_node = 1);
@@ -57,18 +57,29 @@ class KVEngine {
 
   template <typename Val>
   void CreateTable(uint32_t table_id, const std::vector<third_party::Range>& ranges, ModelType model_type,
-                   StorageType storage_type, int model_staleness = 0, uint32_t chunk_size = 1);
+                   StorageType storage_type, int model_staleness = 0, uint32_t chunk_size = 1,
+                   int dump_interval = 10000);
+
+  template <typename Val>
+  void CreateTable(uint32_t table_id, std::unique_ptr<AbstractPartitionManager> partition_manager, ModelType model_type,
+                   StorageType storage_type, int model_staleness = 0, uint32_t chunk_size = 1,
+                   int dump_interval = 10000);
 
   // Create SparseSSP Table, for testing sparsessp use only.
   template <typename Val>
   void CreateSparseSSPTable(uint32_t table_id, const std::vector<third_party::Range>& ranges, ModelType model_type,
-                   StorageType storage_type, int model_staleness = 0, int speculation = 0,
-                   SparseSSPRecorderType sparse_ssp_recorder_type = SparseSSPRecorderType::None);
+                            StorageType storage_type, int model_staleness = 0, int speculation = 0,
+                            SparseSSPRecorderType sparse_ssp_recorder_type = SparseSSPRecorderType::None);
 
   void Run(const MLTask& task);
+
  private:
   WorkerSpec AllocateWorkers(const std::vector<WorkerAlloc>& worker_alloc);
-  void RegisterRangePartitionManager(uint32_t table_id, const std::vector<third_party::Range>& ranges, uint32_t chunk_size = 1);
+
+  void RegisterPartitionManager(uint32_t table_id, std::unique_ptr<AbstractPartitionManager> partition_manager);
+
+  void RegisterRangePartitionManager(uint32_t table_id, const std::vector<third_party::Range>& ranges,
+                                     uint32_t chunk_size = 1);
   void InitTable(uint32_t table_id, const std::vector<uint32_t>& worker_ids);
 
  private:
@@ -78,7 +89,7 @@ class KVEngine {
   std::vector<Node> nodes_;
 
   SimpleIdMapper* const id_mapper_;  // not owned
-  Mailbox* const mailbox_;  // not owned
+  Mailbox* const mailbox_;           // not owned
 
   // Elements managed by KVEngine
   std::unique_ptr<Sender> sender_;
@@ -89,9 +100,65 @@ class KVEngine {
   std::unique_ptr<ServerThreadGroup> server_thread_group_;
 };
 
+/**
+ * Create a table using the given partition manager
+ *
+ * 1. Register the partition manager to the model
+ * 2. For each local server thread maintained by the engine
+ *    a. Create a storage according to <storage_type>
+ *    b. Create a model according to <model_type>
+ *    c. Register the model to the server thread
+ *
+ * @param partition_manager   the model partition manager
+ * @param model_type          the consistency of model - bsp, ssp, asp
+ * @param storage_type        the storage type - map, vector...
+ * @param model_staleness     the staleness for ssp model
+ * @param chunk_size          the basic unit size of access model parameters
+ */
+template <typename Val>
+void KVEngine::CreateTable(uint32_t table_id, std::unique_ptr<AbstractPartitionManager> partition_manager,
+                           ModelType model_type, StorageType storage_type, int model_staleness, uint32_t chunk_size,
+                           int dump_interval) {
+  CHECK(server_thread_group_);
+  CHECK(id_mapper_);
+  auto server_thread_ids = id_mapper_->GetAllServerThreads();
+  CHECK_EQ(partition_manager->GetNumServers(), server_thread_ids.size());
+
+  // Register partition manager
+  RegisterPartitionManager(table_id, std::move(partition_manager));
+
+  for (auto& server_thread : *server_thread_group_) {
+    std::unique_ptr<AbstractStorage> storage;
+    std::unique_ptr<AbstractModel> model;
+    // Set up storage
+    if (storage_type == StorageType::Map) {
+      storage.reset(new MapStorage<Val>(chunk_size));
+    } else if (storage_type == StorageType::Vector) {
+      // TODO(tatiana): better handler
+      CHECK(false) << "[KVEngine::CreateTable] vector storage type is not supported for general partition scheme";
+    } else {
+      CHECK(false) << "[KVEngine::CreateTable] Unknown storage_type";
+    }
+    // Set up model
+    if (model_type == ModelType::SSP) {
+      model.reset(new SSPModel(table_id, std::move(storage), model_staleness, server_thread_group_->GetReplyQueue()));
+    } else if (model_type == ModelType::BSP) {
+      model.reset(new BSPModel(table_id, std::move(storage), server_thread_group_->GetReplyQueue()));
+    } else if (model_type == ModelType::ASP) {
+      model.reset(new ASPModel(table_id, std::move(storage), server_thread_group_->GetReplyQueue()));
+    } else if (model_type == ModelType::BSPResetAdd) {
+      model.reset(new BSPModelResetAdd(table_id, std::move(storage), server_thread_group_->GetReplyQueue()));
+    } else {
+      CHECK(false) << "[KVEngine::CreateTable] Unknown model_type";
+    }
+    model->SetDumpInterval(dump_interval);
+    server_thread->RegisterModel(table_id, std::move(model));
+  }
+}
+
 template <typename Val>
 void KVEngine::CreateTable(uint32_t table_id, const std::vector<third_party::Range>& ranges, ModelType model_type,
-                         StorageType storage_type, int model_staleness, uint32_t chunk_size) {
+                           StorageType storage_type, int model_staleness, uint32_t chunk_size, int dump_interval) {
   RegisterRangePartitionManager(table_id, ranges, chunk_size);
   CHECK(server_thread_group_);
 
@@ -118,17 +185,20 @@ void KVEngine::CreateTable(uint32_t table_id, const std::vector<third_party::Ran
       model.reset(new BSPModel(table_id, std::move(storage), server_thread_group_->GetReplyQueue()));
     } else if (model_type == ModelType::ASP) {
       model.reset(new ASPModel(table_id, std::move(storage), server_thread_group_->GetReplyQueue()));
+    } else if (model_type == ModelType::BSPResetAdd) {
+      model.reset(new BSPModelResetAdd(table_id, std::move(storage), server_thread_group_->GetReplyQueue()));
     } else {
       CHECK(false) << "Unknown model_type";
     }
+    model->SetDumpInterval(dump_interval);
     server_thread->RegisterModel(table_id, std::move(model));
   }
 }
 
 template <typename Val>
-void KVEngine::CreateSparseSSPTable(uint32_t table_id, const std::vector<third_party::Range>& ranges, ModelType model_type,
-                         StorageType storage_type, int model_staleness, int speculation,
-                         SparseSSPRecorderType sparse_ssp_recorder_type) {
+void KVEngine::CreateSparseSSPTable(uint32_t table_id, const std::vector<third_party::Range>& ranges,
+                                    ModelType model_type, StorageType storage_type, int model_staleness,
+                                    int speculation, SparseSSPRecorderType sparse_ssp_recorder_type) {
   RegisterRangePartitionManager(table_id, ranges);
   CHECK(server_thread_group_);
 
@@ -156,8 +226,7 @@ void KVEngine::CreateSparseSSPTable(uint32_t table_id, const std::vector<third_p
       recorder.reset(new UnorderedMapSparseSSPRecorder(model_staleness, speculation));
     } else if (sparse_ssp_recorder_type == SparseSSPRecorderType::Vector) {
       auto it = std::find(server_thread_ids.begin(), server_thread_ids.end(), server_thread->GetServerId());
-      recorder.reset(
-          new VectorSparseSSPRecorder(model_staleness, speculation, ranges[it - server_thread_ids.begin()]));
+      recorder.reset(new VectorSparseSSPRecorder(model_staleness, speculation, ranges[it - server_thread_ids.begin()]));
     } else {
       CHECK(false) << "Unknown recorder type";
     }

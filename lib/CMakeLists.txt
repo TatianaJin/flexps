@@ -3,6 +3,13 @@ include_directories(${PROJECT_SOURCE_DIR} ${HUSKY_EXTERNAL_INCLUDE})
 file(GLOB lib-src-files
 	libsvm_parser.cpp
 	batch_data_sampler.cpp
+    data_loader/hdfs_data_loader.cpp
+    objectives/objective.cpp
+    objectives/sigmoid_objective.cpp
+    objectives/linear_regression_objective.cpp
+    optimizers/optimizer.cpp
+    optimizers/svrg_optimizer.cpp
+    optimizers/sgd_optimizer.cpp
 	)
 
 add_library(lib-objs OBJECT ${lib-src-files})

@@ -8,19 +8,21 @@
 #include "server/pending_buffer.hpp"
 #include "server/progress_tracker.hpp"
 
-
 namespace flexps {
 
 class ASPModel : public AbstractModel {
  public:
   explicit ASPModel(uint32_t model_id, std::unique_ptr<AbstractStorage>&& storage_ptr,
-                    ThreadsafeQueue<Message>* reply_queue);
+                    ThreadsafeQueue<Message>* reply_queue, int dump_interval = 10000);
 
   virtual void Clock(Message& msg) override;
   virtual void Add(Message& msg) override;
   virtual void Get(Message& msg) override;
   virtual int GetProgress(int tid) override;
   virtual void ResetWorker(Message& msg) override;
+
+  virtual void Dump(int server_id, const std::string& path = "") override;
+  virtual void Load(const std::string& file_name) override;
 
  private:
   uint32_t model_id_;

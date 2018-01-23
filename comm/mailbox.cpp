@@ -153,7 +153,7 @@ void Mailbox::Receiving() {
         CHECK(false) << "Barrier error.";
       }
     } else {
-      CHECK(queue_map_.find(msg.meta.recver) != queue_map_.end());
+      CHECK(queue_map_.find(msg.meta.recver) != queue_map_.end()) << "[Mailbox] destination " << msg.meta.recver << " is not registered";
       queue_map_[msg.meta.recver]->Push(std::move(msg));
     }
   }

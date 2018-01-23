@@ -84,7 +84,7 @@ TEST_F(TestVectorStorage, SubAddSubGet) {
   third_party::SArray<float> s_vals({0.1, 0.2, 0.3});
   s.SubAdd(s_keys, third_party::SArray<char>(s_vals));
   third_party::SArray<float> ret = third_party::SArray<float>(s.SubGet(s_keys));
-  for (int i = 0; i < s_keys.size(); ++ i) {
+  for (int i = 0; i < s_keys.size(); ++i) {
     EXPECT_EQ(ret[i], s_vals[i]);
   }
 }
@@ -98,12 +98,54 @@ TEST_F(TestVectorStorage, SubAddChunkSubGetChunk) {
   }
   s.SubAddChunk(s_keys, third_party::SArray<char>(s_vals));
   third_party::SArray<float> ret = third_party::SArray<float>(s.SubGetChunk(s_keys));
-  for (int i = 0; i < s_vals.size(); ++ i) {
+  for (int i = 0; i < s_vals.size(); ++i) {
     EXPECT_EQ(ret[i], s_vals[i]);
   }
 }
 
+TEST_F(TestVectorStorage, Clear) {
+  VectorStorage<float> s({10, 30}, 10);
+
+  // Store something
+  third_party::SArray<float> s_vals(20);
+  third_party::SArray<Key> s_keys({1, 2});
+  for (int i = 0; i < 20; i++) {
+    s_vals[i] = i / 10.0;
+  }
+  s.SubAddChunk(s_keys, third_party::SArray<char>(s_vals));
+
+  // Clear
+  s.Clear();
+  auto ret = third_party::SArray<float>(s.SubGetChunk(s_keys));
+  for (int i = 0; i < s_vals.size(); ++i) {
+    EXPECT_EQ(ret[i], 0.0);
+  }
+}
+
+TEST_F(TestVectorStorage, WriteLoad) {
+  VectorStorage<float> s({10, 40}, 10);
+
+  // Store something
+  third_party::SArray<float> s_vals(20);
+  third_party::SArray<Key> s_keys({1, 2});
+  for (int i = 0; i < 20; i++) {
+    s_vals[i] = i / 10.0;
+  }
+  s.SubAddChunk(s_keys, third_party::SArray<char>(s_vals));
+
+  s.WriteTo(".tmp_model");
+  s.Clear();
+  s.LoadFrom(".tmp_model");
+
+  // Check
+  EXPECT_EQ(s.Size(), 30);
+  EXPECT_EQ(s.GetBegin(), 10);
+  EXPECT_EQ(s.GetEnd(), 40);
+  third_party::SArray<float> ret = third_party::SArray<float>(s.SubGetChunk(s_keys));
+  for (int i = 0; i < s_vals.size(); ++i) {
+    EXPECT_EQ(ret[i], s_vals[i]);
+  }
+}
 
 }  // namespace
 }  // namespace flexps
-

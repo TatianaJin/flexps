@@ -86,8 +86,14 @@ WorkerSpec KVEngine::AllocateWorkers(const std::vector<WorkerAlloc>& worker_allo
   return worker_spec;
 }
 
+void KVEngine::RegisterPartitionManager(uint32_t table_id,
+                                        std::unique_ptr<AbstractPartitionManager> partition_manager) {
+  CHECK(partition_manager_map_.find(table_id) == partition_manager_map_.end());
+  partition_manager_map_[table_id] = std::move(partition_manager);
+}
 
-void KVEngine::RegisterRangePartitionManager(uint32_t table_id, const std::vector<third_party::Range>& ranges, uint32_t chunk_size) {
+void KVEngine::RegisterRangePartitionManager(uint32_t table_id, const std::vector<third_party::Range>& ranges,
+                                             uint32_t chunk_size) {
   CHECK(id_mapper_);
   auto server_thread_ids = id_mapper_->GetAllServerThreads();
   CHECK_EQ(ranges.size(), server_thread_ids.size());

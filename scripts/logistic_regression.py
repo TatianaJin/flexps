@@ -3,24 +3,24 @@
 import sys
 from launch_utils import launch_util
 
-hostfile = "machinefiles/5node"
-progfile = "debug/LRExample"
+hostfile = "machinefiles/local"
+progfile = "build/LRExample"
 
 params = {
     "hdfs_namenode" : "proj10",
     "hdfs_namenode_port" : 9000,
-    "input" : "hdfs:///jasper/kdd12",
+    "input" : "hdfs:///datasets/classification/a9",
     "kStaleness" : 0,
     "kSpeculation" : 5,
-    "kModelType" : "SSP",  # {ASP/SSP/BSP/SparseSSP}
+    "kModelType" : "BSP",  # {ASP/SSP/BSP/SparseSSP}
     "kSparseSSPRecorderType" : "Vector",  # {Vector/Map}
-    "num_dims" : 54686452,
+    "num_dims" : 123,
     "batch_size" : 1,
-    "num_workers_per_node" : 2,
+    "num_workers_per_node" : 1,
     "num_servers_per_node" : 1,
-    "num_iters" : 1000,
+    "num_iters" : 32561,
     "alpha" : 0.1, # learning rate
-    "with_injected_straggler" : 1,  # {0/1}
+    "with_injected_straggler" : 0,  # {0/1}
     "kStorageType" : "Vector",  # {Vector/Map}
 }
 

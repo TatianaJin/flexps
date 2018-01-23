@@ -4,6 +4,7 @@ file(GLOB server-src-files
   ssp_model.cpp
   asp_model.cpp
   bsp_model.cpp
+  bsp_model_reset_add.cpp
   progress_tracker.cpp
   server_thread.cpp
   pending_buffer.cpp

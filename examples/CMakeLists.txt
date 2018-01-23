@@ -56,5 +56,20 @@ if(LIBHDFS3_FOUND)
   add_dependencies(LRExample ${external_project_dependencies})
 endif(LIBHDFS3_FOUND)
 
+# LinearClassifier and LRLossReport
+if(LIBHDFS3_FOUND)
+  add_executable(LinearClassifier linear_classifier/linear_classifier.cpp)
+  target_link_libraries(LinearClassifier flexps)
+  target_link_libraries(LinearClassifier ${HUSKY_EXTERNAL_LIB})
+  set_property(TARGET LinearClassifier PROPERTY CXX_STANDARD 11)
+  add_dependencies(LinearClassifier ${external_project_dependencies})
+
+  add_executable(LRLossReport linear_classifier/loss_report.cpp)
+  target_link_libraries(LRLossReport flexps)
+  target_link_libraries(LRLossReport ${HUSKY_EXTERNAL_LIB})
+  set_property(TARGET LRLossReport PROPERTY CXX_STANDARD 11)
+  add_dependencies(LRLossReport ${external_project_dependencies})
+endif(LIBHDFS3_FOUND)
+
 # GBDTExample
 add_subdirectory(gbdt)
