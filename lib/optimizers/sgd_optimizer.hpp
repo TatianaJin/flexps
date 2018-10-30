@@ -35,8 +35,8 @@ class SGDOptimizer : public Optimizer {
       ValT alpha = config.alpha / (iter / config.learning_rate_decay + 1);
       alpha = std::max(1e-5, alpha);
 
-      Update(table, batch_data_sampler, alpha, config.batch_size);
-      table.Clock();
+      Update(*table, batch_data_sampler, alpha, config.batch_size);
+      table->Clock();
 
       // b. Report loss on training samples
       if (report_interval_ != 0 && (iter + 1) % report_interval_ == 0) {
@@ -46,13 +46,13 @@ class SGDOptimizer : public Optimizer {
           third_party::SArray<Key> keys;
           objective_->AllKeys(&keys);
           // pull model
-          table.Get(keys, &vals);
+          table->Get(keys, &vals);
           // test with training samples
           auto loss = objective_->GetLoss(data_store.Get(), vals);
           LOG(INFO) << "Iter, Time, Loss: " << iter << "," << train_timer.elapsed_time() << "," << std::setprecision(15)
                     << loss;
         }
-        table.Clock();
+        table->Clock();
         train_timer.start();
       }
     }
@@ -60,7 +60,7 @@ class SGDOptimizer : public Optimizer {
       third_party::SArray<ValT> vals;
       third_party::SArray<Key> keys;
       objective_->AllKeys(&keys);
-      table.Get(keys, &vals);
+      table->Get(keys, &vals);
       auto accuracy = objective_->GetAccuracy(data_store.Get(), vals);
       LOG(INFO) << "Accuracy: " << accuracy;
     }

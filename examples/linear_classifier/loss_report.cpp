@@ -171,13 +171,13 @@ void Run() {
           }
 
           // b. Update to parameter servers
-          table.Add(key_part, model_part);
+          table->Add(key_part, model_part);
         }
-        table.Clock();
+        table->Clock();
         if (keys.empty()) {  // To avoid problem with too advanced clock in BSP
           keys.push_back(0);
         }
-        table.Get(keys, &model);
+        table->Get(keys, &model);
       }
 
       // 2. Calculate loss and add regularization penalty distributedly by local leaders
@@ -192,9 +192,9 @@ void Run() {
 
       // 3. Update loss and output
       third_party::SArray<ValT> loss_arr({loss, accuracy});
-      loss_table.Add({0, 1}, loss_arr);
-      loss_table.Clock();
-      loss_table.Get({0, 1}, &loss_arr);
+      loss_table->Add({0, 1}, loss_arr);
+      loss_table->Clock();
+      loss_table->Get({0, 1}, &loss_arr);
       if (info.worker_id == 0) {
         CHECK_EQ(loss_arr.size(), 2);
         LOG(INFO) << "Iteration, loss, accuracy: " << version << std::setprecision(15) << "," << loss_arr[0] << ","

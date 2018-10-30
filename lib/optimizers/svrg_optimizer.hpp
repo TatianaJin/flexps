@@ -54,7 +54,7 @@ class SVRGOptimizer : public Optimizer {
 
     // Calculate dimension inverse probability diag matrix
     third_party::SArray<ValT> dim_prob(objective_->GetNumFeatures(), 0);
-    GetDimensionOccurrence(&dim_prob, gradient_table, samples);
+    GetDimensionOccurrence(&dim_prob, *gradient_table, samples);
     for (int idx = 0; idx < objective_->GetNumFeatures(); ++idx) {
       dim_prob[idx] = (ValT) config.cardinality / dim_prob[idx];
     }
@@ -67,23 +67,23 @@ class SVRGOptimizer : public Optimizer {
       delta_s.resize(keys.size(), 0.0);
 
       if (config.async) {  // online svrg
-        table.Get(keys, &snapshot);
+        table->Get(keys, &snapshot);
         objective_->GetGradient(samples, keys, snapshot, &delta_s);
       } else {                       // sync full gradient step
-        table.Get(keys, &snapshot);  // TODO(tatiana): shared pull
+        table->Get(keys, &snapshot);  // TODO(tatiana): shared pull
         objective_->GetGradient(samples, keys, snapshot, &delta_s, config.cardinality);
 
-        gradient_table.Add(keys, delta_s);
-        gradient_table.Clock();
-        gradient_table.Get(keys, &delta_s);
+        gradient_table->Add(keys, delta_s);
+        gradient_table->Clock();
+        gradient_table->Get(keys, &delta_s);
       }
 
       LOG(INFO) << "[SVRGOptimizer] Epoch " << epoch << ": Full gradient step done";
 
       // B. inner iteration
       for (int iter = 0; iter < config.num_iters; ++iter) {
-        Update(table, batch_data_sampler, config.alpha, config, snapshot, delta_s, dim_prob, keys);
-        table.Clock();
+        Update(*table, batch_data_sampler, config.alpha, config, snapshot, delta_s, dim_prob, keys);
+        table->Clock();
       }
     }
 
